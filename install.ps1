@@ -107,6 +107,84 @@ function Setup-WindowsStartup ($targetDir, $port) {
     }
 }
 
+# بررسی و پیشنهاد نصب اختیاری FFmpeg برای لایو استریم
+function Suggest-InstallFFmpeg ($targetDir) {
+    Write-Host "`n  قابلیت جانبی: پخش زنده تصاویر (Live RTSP Stream via FFmpeg)" -ForegroundColor White
+    $ffmpegCmd = Get-Command "ffmpeg" -ErrorAction SilentlyContinue
+    $localFfmpeg = Join-Path $targetDir "ffmpeg.exe"
+    if ($ffmpegCmd -or (Test-Path $localFfmpeg)) {
+        Write-LogOk "FFmpeg detected on system (Live Stream capability is active)." "ابزار FFmpeg روی سیستم شناسایی شد (پخش زنده فعال است)."
+        return
+    }
+
+    Write-LogWarn "FFmpeg is not installed or not in PATH." "ابزار FFmpeg شناسایی نشد."
+    Write-LogInfo "Didban works 100% without FFmpeg (Monitoring, DB, Web UI, and Snapshots are active)." "سامانه بدون FFmpeg کاملاً کار می‌کند (پایش، دیتابیس، پنل وب و اسنپ‌شات‌ها فعالند)."
+    Write-LogInfo "FFmpeg is only needed for live browser video streaming." "ابزار FFmpeg صرفاً جهت پخش زنده جریان دوربین‌ها در مرورگر نیاز است."
+
+    $wantFfmpeg = Prompt-UserText "آیا مایل به نصب خودکار ابزار FFmpeg هستید؟ (y/n)" "n"
+    if ($wantFfmpeg -notmatch '^[Yy]') {
+        Write-LogInfo "Skipped FFmpeg installation." "از نصب FFmpeg صرف‌نظر شد."
+        return
+    }
+
+    $installed = $false
+    # ۱. تلاش با winget
+    $wingetCmd = Get-Command "winget" -ErrorAction SilentlyContinue
+    if ($wingetCmd) {
+        Write-LogInfo "Attempting fast install via Windows Package Manager (winget)..." "تلاش برای نصب سریع با winget..."
+        try {
+            $p = Start-Process -FilePath "winget" -ArgumentList "install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements" -NoNewWindow -Wait -PassThru
+            if ($p.ExitCode -eq 0) {
+                $installed = $true
+                Write-LogOk "FFmpeg installed successfully via winget." "ابزار FFmpeg با موفقیت از طریق winget نصب شد."
+            }
+        } catch {
+            Write-LogWarn "Winget install failed or was cancelled." "نصب از طریق winget ناموفق بود."
+        }
+    }
+
+    # ۲. تلاش با choco در صورت وجود
+    if (-not $installed) {
+        $chocoCmd = Get-Command "choco" -ErrorAction SilentlyContinue
+        if ($chocoCmd) {
+            Write-LogInfo "Attempting install via Chocolatey (choco)..." "تلاش برای نصب با Chocolatey..."
+            try {
+                $p = Start-Process -FilePath "choco" -ArgumentList "install ffmpeg -y" -NoNewWindow -Wait -PassThru
+                if ($p.ExitCode -eq 0) {
+                    $installed = $true
+                    Write-LogOk "FFmpeg installed successfully via Chocolatey." "ابزار FFmpeg با چاکلتی نصب شد."
+                }
+            } catch {
+                Write-LogWarn "Chocolatey install failed." "نصب با choco ناموفق بود."
+            }
+        }
+    }
+
+    # ۳. تلاش با scoop در صورت وجود
+    if (-not $installed) {
+        $scoopCmd = Get-Command "scoop" -ErrorAction SilentlyContinue
+        if ($scoopCmd) {
+            Write-LogInfo "Attempting install via Scoop..." "تلاش برای نصب با Scoop..."
+            try {
+                $p = Start-Process -FilePath "scoop" -ArgumentList "install ffmpeg" -NoNewWindow -Wait -PassThru
+                if ($p.ExitCode -eq 0) {
+                    $installed = $true
+                    Write-LogOk "FFmpeg installed successfully via Scoop." "ابزار FFmpeg با Scoop نصب شد."
+                }
+            } catch {
+                Write-LogWarn "Scoop install failed." "نصب با Scoop ناموفق بود."
+            }
+        }
+    }
+
+    if (-not $installed) {
+        Write-LogWarn "Automatic installation not available for this Windows environment." "امکان نصب خودکار در این نسخه ویندوز یا سرور مهیا نبود."
+        Write-LogInfo "For Windows Server or older Windows, download ffmpeg.exe from official release:" "برای ویندوز سرور یا نسخه‌های قدیمی‌تر، می‌توانید فایل باینری را دریافت نمایید:"
+        Write-Host "     🔗 صفحه رسمی دانلود FFmpeg: https://ffmpeg.org/download.html" -ForegroundColor Cyan
+        Write-Host "     💡 کافی است فایل ffmpeg.exe دانلود شده را در پوشه برنامه ($targetDir) یا در PATH سیستم قرار دهید." -ForegroundColor Yellow
+    }
+}
+
 # ساخت اسکریپت کنترل دیدبان در پوشه نصب (didban.ps1 و didban.bat)
 function Generate-ManagerScripts ($targetDir, $defaultPort) {
     $ps1Content = @'
@@ -417,6 +495,9 @@ HOST=0.0.0.0
 
     # ساخت فایل‌های مدیریتی
     Generate-ManagerScripts $targetDir $webPort
+
+    # پیشنهاد نصب اختیاری FFmpeg برای لایو استریم
+    Suggest-InstallFFmpeg $targetDir
 
     Write-Host "`n  مرحله ۴: سرویس پس‌زمینه و راه‌اندازی خودکار" -ForegroundColor White
     $enableStartup = Prompt-UserText "آیا مایل به اجرای خودکار در هنگام روشن شدن ویندوز هستید؟ (y/n)" "y"
