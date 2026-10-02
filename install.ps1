@@ -19,46 +19,76 @@ param(
     [string]$InstallPath = "C:\Didban"
 )
 
-# تنظیم انکودینگ خروجی ترمینال به UTF-8
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
+# تنظیم انکودینگ کنسول به UTF-8
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    [Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+    $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch {}
 
 $RepoRelease = "mehdichamani/didban-release"
 $LatestZipUrl = "https://github.com/$RepoRelease/releases/latest/download/didban-windows-x86_64.zip"
 
+# متغیر سراسری زبان (پیش‌فرض: en)
+$global:LangMode = "en"
+
+function Select-Language {
+    Write-Host "`n  ╔═══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+    Write-Host "  ║        🛡️ Didban CCTV Monitoring System / سامانه دیدبان       ║" -ForegroundColor Cyan
+    Write-Host "  ╚═══════════════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
+
+    Write-Host "  Persian rendering check / بررسی خوانایی فونت فارسی:" -ForegroundColor White
+    Write-Host "  [ متن آزمایشی فارسی: دیدبان سیستم نظارت ]`n" -ForegroundColor Yellow
+
+    Write-Host "  Press [Enter] to continue in English (Recommended for Windows terminal / PuTTY)" -ForegroundColor Green
+    Write-Host "  Or type [F] then Enter for Persian (فارسی)`n" -ForegroundColor Yellow
+
+    $choice = Read-Host "  Choice / انتخاب [English]"
+    if ($choice -match '^[Ff]') {
+        $global:LangMode = "fa"
+    } else {
+        $global:LangMode = "en"
+    }
+}
+
 function Write-Header {
     Write-Host "`n  ╔═══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "  ║        🛡️ سامانه پایش و مانیتورینگ دوربین دیدبان (Didban)     ║" -ForegroundColor Cyan
-    Write-Host "  ║       اسکریپت نصب و به‌روزرسانی خودکار و هوشمند ویندوز        ║" -ForegroundColor Cyan
+    if ($global:LangMode -eq "fa") {
+        Write-Host "  ║        🛡️ سامانه پایش و مانیتورینگ دوربین دیدبان (Didban)     ║" -ForegroundColor Cyan
+        Write-Host "  ║       اسکریپت نصب و به‌روزرسانی خودکار و هوشمند ویندوز        ║" -ForegroundColor Cyan
+    } else {
+        Write-Host "  ║             🛡️ Didban CCTV Monitoring System                  ║" -ForegroundColor Cyan
+        Write-Host "  ║       Fast & Automated Windows Installer & Updater            ║" -ForegroundColor Cyan
+    }
     Write-Host "  ╚═══════════════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 }
 
 function Write-LogInfo ($en, $fa) {
+    $msg = if ($global:LangMode -eq "fa" -and $fa) { $fa } else { $en }
     Write-Host "  ● [INFO] " -NoNewline -ForegroundColor Cyan
-    Write-Host "$en " -NoNewline -ForegroundColor White
-    if ($fa) { Write-Host "│ $fa" -ForegroundColor DarkGray } else { Write-Host "" }
+    Write-Host $msg -ForegroundColor White
 }
 
 function Write-LogOk ($en, $fa) {
+    $msg = if ($global:LangMode -eq "fa" -and $fa) { $fa } else { $en }
     Write-Host "  ✔ [OK]   " -NoNewline -ForegroundColor Green
-    Write-Host "$en " -NoNewline -ForegroundColor White
-    if ($fa) { Write-Host "│ $fa" -ForegroundColor DarkGray } else { Write-Host "" }
+    Write-Host $msg -ForegroundColor White
 }
 
 function Write-LogWarn ($en, $fa) {
+    $msg = if ($global:LangMode -eq "fa" -and $fa) { $fa } else { $en }
     Write-Host "  ▲ [WARN] " -NoNewline -ForegroundColor Yellow
-    Write-Host "$en " -NoNewline -ForegroundColor White
-    if ($fa) { Write-Host "│ $fa" -ForegroundColor DarkGray } else { Write-Host "" }
+    Write-Host $msg -ForegroundColor White
 }
 
 function Write-LogErr ($en, $fa) {
+    $msg = if ($global:LangMode -eq "fa" -and $fa) { $fa } else { $en }
     Write-Host "  ✖ [ERR]  " -NoNewline -ForegroundColor Red
-    Write-Host "$en " -NoNewline -ForegroundColor White
-    if ($fa) { Write-Host "│ $fa" -ForegroundColor DarkGray } else { Write-Host "" }
+    Write-Host $msg -ForegroundColor White
 }
 
-# دریافت ورودی تعاملی با مقدار پیش‌فرض
-function Prompt-UserText ($prompt, $defaultVal) {
+function Prompt-UserText ($promptEn, $promptFa, $defaultVal) {
+    $prompt = if ($global:LangMode -eq "fa" -and $promptFa) { $promptFa } else { $promptEn }
     if ($defaultVal) {
         $ans = Read-Host "  ? $prompt [$defaultVal]"
         if ([string]::IsNullOrWhiteSpace($ans)) { return $defaultVal }
@@ -69,7 +99,6 @@ function Prompt-UserText ($prompt, $defaultVal) {
     }
 }
 
-# توقف تمام پروسه‌های دیدبان در حال اجرا در ویندوز
 function Stop-DidbanProcesses ($targetDir) {
     Write-LogInfo "Stopping any running Didban processes..." "در حال متوقف‌سازی پروسه‌های قبلی دیدبان..."
     $procs = Get-Process -Name "main" -ErrorAction SilentlyContinue
@@ -78,7 +107,7 @@ function Stop-DidbanProcesses ($targetDir) {
             $pPath = $p.Path
             if ($pPath -like "*$targetDir*") {
                 Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-                Write-LogOk "Stopped process PID $($p.Id)" "پروسه متوقف شد"
+                Write-LogOk "Stopped process PID $($p.Id)" "پروسه متوقف شد (PID: $($p.Id))"
             }
         } catch {
             Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
@@ -86,7 +115,6 @@ function Stop-DidbanProcesses ($targetDir) {
     }
 }
 
-# تنظیم سرویس پس‌زمینه استارت‌آپ ویندوز (روش تست‌شده start.ps1)
 function Setup-WindowsStartup ($targetDir, $port) {
     Write-LogInfo "Configuring Windows Auto-Start Background Service..." "در حال تنظیم سرویس خودکار استارت‌آپ ویندوز..."
     try {
@@ -101,15 +129,20 @@ function Setup-WindowsStartup ($targetDir, $port) {
         $shortcut.Description = "Didban CCTV Monitoring Background Service"
         $shortcut.Save()
 
-        Write-LogOk "Windows Auto-Start configured successfully." "سرویس استارت‌آپ ویندوز فعال گردید."
+        Write-LogOk "Windows Auto-Start configured successfully." "سرویس استارت‌آپ ویندوز با موفقیت فعال گردید."
     } catch {
-        Write-LogWarn "Failed to configure Windows Startup: $_" "خطا در تنظیم استارت‌آپ خودکار"
+        Write-LogWarn "Failed to configure Windows Startup: $_" "خطا در تنظیم استارت‌آپ خودکار: $_"
     }
 }
 
-# بررسی و پیشنهاد نصب اختیاری FFmpeg برای لایو استریم
 function Suggest-InstallFFmpeg ($targetDir) {
-    Write-Host "`n  قابلیت جانبی: پخش زنده تصاویر (Live RTSP Stream via FFmpeg)" -ForegroundColor White
+    Write-Host ""
+    if ($global:LangMode -eq "fa") {
+        Write-Host "  قابلیت جانبی: پخش زنده تصاویر (Live RTSP Stream via FFmpeg)" -ForegroundColor White
+    } else {
+        Write-Host "  Optional Feature: Live Video Streaming (Live RTSP Stream via FFmpeg)" -ForegroundColor White
+    }
+
     $ffmpegCmd = Get-Command "ffmpeg" -ErrorAction SilentlyContinue
     $localFfmpeg = Join-Path $targetDir "ffmpeg.exe"
     if ($ffmpegCmd -or (Test-Path $localFfmpeg)) {
@@ -121,17 +154,17 @@ function Suggest-InstallFFmpeg ($targetDir) {
     Write-LogInfo "Didban works 100% without FFmpeg (Monitoring, DB, Web UI, and Snapshots are active)." "سامانه بدون FFmpeg کاملاً کار می‌کند (پایش، دیتابیس، پنل وب و اسنپ‌شات‌ها فعالند)."
     Write-LogInfo "FFmpeg is only needed for live browser video streaming." "ابزار FFmpeg صرفاً جهت پخش زنده جریان دوربین‌ها در مرورگر نیاز است."
 
-    $wantFfmpeg = Prompt-UserText "آیا مایل به نصب خودکار ابزار FFmpeg هستید؟ (y/n)" "n"
+    $wantFfmpeg = Prompt-UserText "Install FFmpeg automatically? (y/n)" "آیا مایل به نصب خودکار ابزار FFmpeg هستید؟ (y/n)" "n"
     if ($wantFfmpeg -notmatch '^[Yy]') {
         Write-LogInfo "Skipped FFmpeg installation." "از نصب FFmpeg صرف‌نظر شد."
         return
     }
 
     $installed = $false
-    # ۱. تلاش با winget
+    # 1. winget
     $wingetCmd = Get-Command "winget" -ErrorAction SilentlyContinue
     if ($wingetCmd) {
-        Write-LogInfo "Attempting fast install via Windows Package Manager (winget)..." "تلاش برای نصب سریع با winget..."
+        Write-LogInfo "Attempting install via Windows Package Manager (winget)..." "تلاش برای نصب سریع با winget..."
         try {
             $p = Start-Process -FilePath "winget" -ArgumentList "install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements" -NoNewWindow -Wait -PassThru
             if ($p.ExitCode -eq 0) {
@@ -139,11 +172,11 @@ function Suggest-InstallFFmpeg ($targetDir) {
                 Write-LogOk "FFmpeg installed successfully via winget." "ابزار FFmpeg با موفقیت از طریق winget نصب شد."
             }
         } catch {
-            Write-LogWarn "Winget install failed or was cancelled." "نصب از طریق winget ناموفق بود."
+            Write-LogWarn "Winget install failed." "نصب از طریق winget ناموفق بود."
         }
     }
 
-    # ۲. تلاش با choco در صورت وجود
+    # 2. choco
     if (-not $installed) {
         $chocoCmd = Get-Command "choco" -ErrorAction SilentlyContinue
         if ($chocoCmd) {
@@ -160,7 +193,7 @@ function Suggest-InstallFFmpeg ($targetDir) {
         }
     }
 
-    # ۳. تلاش با scoop در صورت وجود
+    # 3. scoop
     if (-not $installed) {
         $scoopCmd = Get-Command "scoop" -ErrorAction SilentlyContinue
         if ($scoopCmd) {
@@ -178,14 +211,13 @@ function Suggest-InstallFFmpeg ($targetDir) {
     }
 
     if (-not $installed) {
-        Write-LogWarn "Automatic installation not available for this Windows environment." "امکان نصب خودکار در این نسخه ویندوز یا سرور مهیا نبود."
-        Write-LogInfo "For Windows Server or older Windows, download ffmpeg.exe from official release:" "برای ویندوز سرور یا نسخه‌های قدیمی‌تر، می‌توانید فایل باینری را دریافت نمایید:"
-        Write-Host "     🔗 صفحه رسمی دانلود FFmpeg: https://ffmpeg.org/download.html" -ForegroundColor Cyan
-        Write-Host "     💡 کافی است فایل ffmpeg.exe دانلود شده را در پوشه برنامه ($targetDir) یا در PATH سیستم قرار دهید." -ForegroundColor Yellow
+        Write-LogWarn "Automatic installation not available for this Windows environment." "امکان نصب خودکار در این نسخه ویندوز مهیا نبود."
+        Write-LogInfo "For Windows Server or older Windows, download ffmpeg.exe manually:" "برای ویندوز سرور، می‌توانید فایل باینری را دستی دانلود فرمایید:"
+        Write-Host "     🔗 FFmpeg Official Download: https://ffmpeg.org/download.html" -ForegroundColor Cyan
+        Write-Host "     💡 Place ffmpeg.exe inside ($targetDir) or system PATH." -ForegroundColor Yellow
     }
 }
 
-# ساخت اسکریپت کنترل دیدبان در پوشه نصب (didban.ps1 و didban.bat)
 function Generate-ManagerScripts ($targetDir, $defaultPort) {
     $ps1Content = @'
 #Requires -Version 5.1
@@ -222,10 +254,9 @@ $PidFile = Join-Path $ScriptDir "data\didban.pid"
 $StartupFolder = [Environment]::GetFolderPath("Startup")
 $StartupShortcut = Join-Path $StartupFolder "Didban.lnk"
 
-function Write-Msg ($icon, $color, $en, $fa) {
+function Write-Msg ($icon, $color, $en) {
     Write-Host "  $icon " -NoNewline -ForegroundColor $color
-    Write-Host "$en " -NoNewline -ForegroundColor White
-    if ($fa) { Write-Host "│ $fa" -ForegroundColor DarkGray } else { Write-Host "" }
+    Write-Host "$en" -ForegroundColor White
 }
 
 function Get-DidbanProcess {
@@ -246,7 +277,7 @@ function Get-DidbanProcess {
 function Start-Foreground {
     $p = Get-DidbanProcess
     if ($p) {
-        Write-Msg "▲" "Yellow" "Didban is already running (PID $($p.Id))" "دیدبان در حال اجراست"
+        Write-Msg "▲" "Yellow" "Didban is already running (PID $($p.Id))"
         return
     }
     & "$ScriptDir\main.exe"
@@ -255,7 +286,7 @@ function Start-Foreground {
 function Start-Background {
     $p = Get-DidbanProcess
     if ($p) {
-        Write-Msg "▲" "Yellow" "Didban is already running (PID $($p.Id))" "دیدبان قبلاً در پس‌زمینه اجرا شده است"
+        Write-Msg "▲" "Yellow" "Didban is already running in background (PID $($p.Id))"
         return
     }
     if (-not (Test-Path "data")) { New-Item -ItemType Directory -Path "data" -Force | Out-Null }
@@ -267,10 +298,10 @@ function Start-Background {
     $proc = Start-Process -FilePath "$ScriptDir\main.exe" -WorkingDirectory $ScriptDir -WindowStyle Hidden -RedirectStandardOutput $logOut -RedirectStandardError $logErr -PassThru
     if ($proc -and -not $proc.HasExited) {
         $proc.Id | Out-File -FilePath $PidFile -Encoding utf8
-        Write-Msg "✔" "Green" "Didban started in background (PID $($proc.Id))" "سرویس پس‌زمینه با موفقیت اجرا شد"
+        Write-Msg "✔" "Green" "Didban started in background (PID $($proc.Id))"
         Write-Host "  Panel URL: http://localhost:$Port" -ForegroundColor Cyan
     } else {
-        Write-Msg "✖" "Red" "Failed to start Didban background process" "خطا در اجرای پروسه پس‌زمینه"
+        Write-Msg "✖" "Red" "Failed to start Didban background process"
     }
 }
 
@@ -278,9 +309,9 @@ function Stop-Background {
     $p = Get-DidbanProcess
     if ($p) {
         Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-        Write-Msg "✔" "Green" "Didban service stopped (PID $($p.Id))" "سرویس دیدبان متوقف شد"
+        Write-Msg "✔" "Green" "Didban service stopped (PID $($p.Id))"
     } else {
-        Write-Msg "●" "Yellow" "Didban is not running" "هیچ پروسه فعالی از دیدبان یافت نشد"
+        Write-Msg "●" "Yellow" "Didban is not running"
     }
     if (Test-Path $PidFile) { Remove-Item $PidFile -Force -ErrorAction SilentlyContinue }
 }
@@ -307,15 +338,15 @@ function Enable-AutoStart {
     $shortcut.WorkingDirectory = $ScriptDir
     $shortcut.Description = "Didban CCTV Monitoring Background Service"
     $shortcut.Save()
-    Write-Msg "✔" "Green" "Auto-Start enabled" "اجرای خودکار فعال شد"
+    Write-Msg "✔" "Green" "Auto-Start enabled"
 }
 
 function Disable-AutoStart {
     if (Test-Path $StartupShortcut) {
         Remove-Item $StartupShortcut -Force
-        Write-Msg "✔" "Green" "Auto-Start disabled" "اجرای خودکار غیرفعال شد"
+        Write-Msg "✔" "Green" "Auto-Start disabled"
     } else {
-        Write-Msg "●" "Yellow" "Auto-Start was not enabled" "استارت‌آپ فعال نبود"
+        Write-Msg "●" "Yellow" "Auto-Start was not enabled"
     }
 }
 
@@ -348,7 +379,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0didban.ps1" %*
     Write-LogOk "Manager scripts (didban.ps1 / didban.bat) generated." "اسکریپت‌های مدیریت و راه‌اندازی سریع ایجاد شدند."
 }
 
-# تابع به‌روزرسانی سامانه به آخرین نسخه
 function Update-Didban ($targetDir) {
     Write-LogInfo "Starting Didban update routine..." "شروع عملیات به‌روزرسانی سامانه دیدبان..."
     Stop-DidbanProcesses $targetDir
@@ -364,54 +394,58 @@ function Update-Didban ($targetDir) {
         Write-LogInfo "Extracting update bundle..." "در حال استخراج بسته جدید..."
         Expand-Archive -Path $tempZip -DestinationPath $tempDir -Force
 
-        # کپی فایل‌های اجرایی به مسیر نصب (بدون دست‌زدن به .env و data\)
         Get-ChildItem -Path $tempDir | ForEach-Object {
             if ($_.Name -ne ".env" -and $_.Name -ne "data" -and $_.Name -ne "monitor.db") {
                 Copy-Item -Path $_.FullName -Destination $targetDir -Recurse -Force
             }
         }
 
-        # بازتولید اسکریپت‌های منیجر
         Generate-ManagerScripts $targetDir 23456
-
         Write-LogOk "Update completed successfully! 🎉" "سامانه دیدبان با موفقیت به آخرین نسخه به‌روزرسانی شد!"
 
-        # راه‌اندازی مجدد در پس‌زمینه
         & (Join-Path $targetDir "didban.ps1") -Action start-bg
     } catch {
-        Write-LogErr "Update failed: $_" "خطا در به‌روزرسانی سامانه"
+        Write-LogErr "Update failed: $_" "خطا در به‌روزرسانی سامانه: $_"
     } finally {
         if (Test-Path $tempZip) { Remove-Item $tempZip -Force -ErrorAction SilentlyContinue }
         if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue }
     }
 }
 
-# تابع اصلی نصب
 function Install-Didban {
+    Select-Language
     Write-Header
 
     $defaultPath = $InstallPath
-    Write-Host "  مرحله ۱: تعیین مسیر نصب سامانه" -ForegroundColor White
-    $targetDir = Prompt-UserText "مسیر نصب برنامه را وارد فرمایید" $defaultPath
+    if ($global:LangMode -eq "fa") {
+        Write-Host "  مرحله ۱: تعیین مسیر نصب سامانه" -ForegroundColor White
+    } else {
+        Write-Host "  Step 1: Installation Directory" -ForegroundColor White
+    }
 
+    $targetDir = Prompt-UserText "Enter installation path" "مسیر نصب برنامه را وارد فرمایید" $defaultPath
     if (-not (Test-Path $targetDir)) {
         New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
     }
 
-    # بررسی اینکه آیا دیدبان قبلاً نصب شده است
     if (Test-Path (Join-Path $targetDir "main.exe")) {
         Write-Host ""
         Write-LogWarn "Didban is already installed in this directory." "سامانه دیدبان پیش‌تر در این مسیر نصب شده است."
-        $doUpdate = Prompt-UserText "آیا می‌خواهید سامانه را به آخرین نسخه به‌روزرسانی (Update) کنید؟ (y/n)" "y"
+        $doUpdate = Prompt-UserText "Update existing installation to latest version? (y/n)" "آیا می‌خواهید سامانه را به آخرین نسخه به‌روزرسانی (Update) کنید؟ (y/n)" "y"
         if ($doUpdate -match '^[Yy]') {
             Update-Didban $targetDir
             return
         }
     }
 
-    Write-Host "`n  مرحله ۲: دانلود و استخراج بسته دیدبان" -ForegroundColor White
-    $tempZip = Join-Path $env:TEMP "didban-windows-x86_64.zip"
+    Write-Host ""
+    if ($global:LangMode -eq "fa") {
+        Write-Host "  مرحله ۲: دانلود و استخراج بسته دیدبان" -ForegroundColor White
+    } else {
+        Write-Host "  Step 2: Download & Extract Package" -ForegroundColor White
+    }
 
+    $tempZip = Join-Path $env:TEMP "didban-windows-x86_64.zip"
     try {
         Write-LogInfo "Downloading official Windows standalone package..." "در حال دانلود بسته رسمی ویندوز..."
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -422,26 +456,34 @@ function Install-Didban {
         Expand-Archive -Path $tempZip -DestinationPath $targetDir -Force
         Write-LogOk "Extraction completed." "فایل‌ها با موفقیت استخراج شدند."
     } catch {
-        Write-LogErr "Failed to download or extract package: $_" "خطا در دانلود یا استخراج بسته"
+        Write-LogErr "Failed to download or extract package: $_" "خطا در دانلود یا استخراج بسته: $_"
         return
     } finally {
         if (Test-Path $tempZip) { Remove-Item $tempZip -Force -ErrorAction SilentlyContinue }
     }
 
-    # ایجاد پوشه data
     $dataDir = Join-Path $targetDir "data"
     if (-not (Test-Path $dataDir)) {
         New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
     }
 
-    Write-Host "`n  مرحله ۳: پیکربندی امنیتی و تعیین حساب مدیر" -ForegroundColor White
-    $adminUser = Prompt-UserText "نام کاربری مدیر سیستم" "admin"
-    $webPort = Prompt-UserText "پورت سرویس وب دیدبان" "23456"
+    Write-Host ""
+    if ($global:LangMode -eq "fa") {
+        Write-Host "  مرحله ۳: پیکربندی امنیتی و تعیین حساب مدیر" -ForegroundColor White
+    } else {
+        Write-Host "  Step 3: Security & Administrator Credentials" -ForegroundColor White
+    }
+
+    $adminUser = Prompt-UserText "Admin username" "نام کاربری مدیر سیستم" "admin"
+    $webPort = Prompt-UserText "Web service port" "پورت سرویس وب دیدبان" "23456"
 
     $plainPass = ""
     while ($true) {
-        $secPass1 = Read-Host "  🔒 کلمه عبور دلخواه مدیر را وارد فرمایید" -AsSecureString
-        $secPass2 = Read-Host "  🔒 کلمه عبور را مجدداً تکرار فرمایید" -AsSecureString
+        $p1Msg = if ($global:LangMode -eq "fa") { "  🔒 کلمه عبور دلخواه مدیر را وارد فرمایید" } else { "  🔒 Enter admin password" }
+        $p2Msg = if ($global:LangMode -eq "fa") { "  🔒 کلمه عبور را مجدداً تکرار فرمایید" } else { "  🔒 Confirm admin password" }
+
+        $secPass1 = Read-Host $p1Msg -AsSecureString
+        $secPass2 = Read-Host $p2Msg -AsSecureString
 
         $pass1 = [System.Net.NetworkCredential]::new("", $secPass1).Password
         $pass2 = [System.Net.NetworkCredential]::new("", $secPass2).Password
@@ -458,7 +500,7 @@ function Install-Didban {
         break
     }
 
-    Write-LogInfo "Generating secure password hash using Didban core engine..." "تولید هش امن کلمه عبور با موتور برنامه..."
+    Write-LogInfo "Generating secure password hash via Didban core engine..." "تولید هش امن کلمه عبور با موتور برنامه..."
     $mainExe = Join-Path $targetDir "main.exe"
     $hashVal = ""
 
@@ -472,7 +514,7 @@ function Install-Didban {
                 }
             }
         } catch {
-            Write-LogWarn "Could not run main.exe directly: $_" "اجرای مستقیم باینری مقدور نبود."
+            Write-LogWarn "Could not run main.exe directly: $_" "اجرای مستقیم باینری مقدور نبود: $_"
         }
     }
 
@@ -483,7 +525,6 @@ function Install-Didban {
         Write-LogOk "Secure password hash generated." "هش امن با موفقیت ایجاد گردید."
     }
 
-    # ایجاد فایل .env
     $envContent = @"
 ADMIN_USER=$adminUser
 ADMIN_PASS=$hashVal
@@ -493,35 +534,48 @@ HOST=0.0.0.0
     Set-Content -Path (Join-Path $targetDir ".env") -Value $envContent -Encoding UTF8
     Write-LogOk "Configuration file (.env) saved." "فایل تنظیمات ذخیره شد."
 
-    # ساخت فایل‌های مدیریتی
     Generate-ManagerScripts $targetDir $webPort
-
-    # پیشنهاد نصب اختیاری FFmpeg برای لایو استریم
     Suggest-InstallFFmpeg $targetDir
 
-    Write-Host "`n  مرحله ۴: سرویس پس‌زمینه و راه‌اندازی خودکار" -ForegroundColor White
-    $enableStartup = Prompt-UserText "آیا مایل به اجرای خودکار در هنگام روشن شدن ویندوز هستید؟ (y/n)" "y"
+    Write-Host ""
+    if ($global:LangMode -eq "fa") {
+        Write-Host "  مرحله ۴: سرویس پس‌زمینه و راه‌اندازی خودکار" -ForegroundColor White
+    } else {
+        Write-Host "  Step 4: Background Service & Auto-Start" -ForegroundColor White
+    }
+
+    $enableStartup = Prompt-UserText "Enable auto-start on Windows boot? (y/n)" "آیا مایل به اجرای خودکار در هنگام روشن شدن ویندوز هستید؟ (y/n)" "y"
     if ($enableStartup -match '^[Yy]') {
         Setup-WindowsStartup $targetDir $webPort
     }
 
-    # شروع آنی سرویس پس‌زمینه
     & (Join-Path $targetDir "didban.ps1") -Action start-bg -Port [int]$webPort
-
-    # باز کردن مرورگر
     Start-Process "http://localhost:$webPort"
 
     Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Green
-    Write-Host "  🎉 نصب و راه‌اندازی سامانه دیدبان با موفقیت به پایان رسید!" -ForegroundColor Green
-    Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Green
-    Write-Host "  🌐 آدرس پنل تحت وب: http://localhost:$webPort" -ForegroundColor Cyan
-    Write-Host "  👤 نام کاربری مدیر: $adminUser" -ForegroundColor Yellow
-    Write-Host "  📁 مسیر برنامه:     $targetDir" -ForegroundColor White
-    Write-Host "`n  ⚙️ مدیریت سامانه با دستورات زیر در خط فرمان یا پاورشل:" -ForegroundColor DarkCyan
-    Write-Host "     .\didban.bat status          نمایش وضعیت سرویس" -ForegroundColor Gray
-    Write-Host "     .\didban.bat stop            توقف سرویس پس‌زمینه" -ForegroundColor Gray
-    Write-Host "     .\didban.bat start-bg        اجرای مجدد در پس‌زمینه" -ForegroundColor Gray
-    Write-Host "     .\didban.bat update          به‌روزرسانی به آخرین نسخه" -ForegroundColor Gray
+    if ($global:LangMode -eq "fa") {
+        Write-Host "  🎉 نصب و راه‌اندازی سامانه دیدبان با موفقیت به پایان رسید!" -ForegroundColor Green
+        Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Green
+        Write-Host "  🌐 آدرس پنل تحت وب: http://localhost:$webPort" -ForegroundColor Cyan
+        Write-Host "  👤 نام کاربری مدیر: $adminUser" -ForegroundColor Yellow
+        Write-Host "  📁 مسیر برنامه:     $targetDir" -ForegroundColor White
+        Write-Host "`n  ⚙️ مدیریت سامانه با دستورات زیر در خط فرمان یا پاورشل:" -ForegroundColor DarkCyan
+        Write-Host "     .\didban.bat status          نمایش وضعیت سرویس" -ForegroundColor Gray
+        Write-Host "     .\didban.bat stop            توقف سرویس پس‌زمینه" -ForegroundColor Gray
+        Write-Host "     .\didban.bat start-bg        اجرای مجدد در پس‌زمینه" -ForegroundColor Gray
+        Write-Host "     .\didban.bat update          به‌روزرسانی به آخرین نسخه" -ForegroundColor Gray
+    } else {
+        Write-Host "  🎉 Didban setup completed successfully!" -ForegroundColor Green
+        Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Green
+        Write-Host "  🌐 Web Dashboard: http://localhost:$webPort" -ForegroundColor Cyan
+        Write-Host "  👤 Admin User:    $adminUser" -ForegroundColor Yellow
+        Write-Host "  📁 Install Dir:   $targetDir" -ForegroundColor White
+        Write-Host "`n  ⚙️ Service Management Commands (CMD or PowerShell):" -ForegroundColor DarkCyan
+        Write-Host "     .\didban.bat status          Check service status" -ForegroundColor Gray
+        Write-Host "     .\didban.bat stop            Stop background service" -ForegroundColor Gray
+        Write-Host "     .\didban.bat start-bg        Start in background" -ForegroundColor Gray
+        Write-Host "     .\didban.bat update          Update to latest release" -ForegroundColor Gray
+    }
     Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Green
 }
 
