@@ -88,6 +88,74 @@ check_dependencies() {
     fi
 }
 
+suggest_install_ffmpeg() {
+    echo ""
+    echo -e "${CLR_BOLD}قابلیت جانبی: پخش زنده تصاویر (Live RTSP Stream via FFmpeg)${CLR_RESET}"
+    if command -v ffmpeg &>/dev/null; then
+        log_ok "ابزار FFmpeg روی سیستم شناسایی شد (قابلیت پخش زنده فعال است)."
+        return 0
+    fi
+
+    log_warn "ابزار FFmpeg شناسایی نشد."
+    log_info "سامانه دیدبان بدون FFmpeg به طور کامل کار می‌کند (پایش وضعیت، دیتابیس، پنل وب و اسنپ‌شات‌ها فعالند)."
+    log_info "ابزار FFmpeg صرفاً جهت پخش زنده جریان دوربین‌ها در مرورگر (Live Stream) کاربرد دارد."
+
+    local want_ffmpeg
+    want_ffmpeg="$(prompt_input "آیا مایل به نصب خودکار ابزار FFmpeg هستید؟ (y/n)" "n")"
+    if [[ ! "$want_ffmpeg" =~ ^[Yy]$ ]]; then
+        log_info "از نصب FFmpeg صرف‌نظر شد. در صورت نیاز می‌توانید آن را در آینده نصب کنید."
+        return 0
+    fi
+
+    log_info "تلاش برای نصب سریع FFmpeg با مدیر بسته‌های سیستم..."
+    local installed=false
+
+    if command -v apt-get &>/dev/null; then
+        log_info "سیستم‌عامل بر پایه دبیان/اوبونتو شناسایی شد (apt-get)..."
+        if [ "$(id -u)" -eq 0 ]; then
+            apt-get update -y && apt-get install -y ffmpeg && installed=true || true
+        elif command -v sudo &>/dev/null; then
+            sudo apt-get update -y && sudo apt-get install -y ffmpeg && installed=true || true
+        fi
+    elif command -v pacman &>/dev/null; then
+        log_info "سیستم‌عامل آرچ لینوکس شناسایی شد (pacman)..."
+        if [ "$(id -u)" -eq 0 ]; then
+            pacman -Sy --noconfirm ffmpeg && installed=true || true
+        elif command -v sudo &>/dev/null; then
+            sudo pacman -Sy --noconfirm ffmpeg && installed=true || true
+        fi
+    elif command -v dnf &>/dev/null; then
+        log_info "سیستم‌عامل RHEL/Fedora/Rocky شناسایی شد (dnf)..."
+        if [ "$(id -u)" -eq 0 ]; then
+            dnf install -y ffmpeg && installed=true || true
+        elif command -v sudo &>/dev/null; then
+            sudo dnf install -y ffmpeg && installed=true || true
+        fi
+    elif command -v yum &>/dev/null; then
+        log_info "سیستم‌عامل CentOS/RHEL شناسایی شد (yum)..."
+        if [ "$(id -u)" -eq 0 ]; then
+            yum install -y ffmpeg && installed=true || true
+        elif command -v sudo &>/dev/null; then
+            sudo yum install -y ffmpeg && installed=true || true
+        fi
+    elif command -v zypper &>/dev/null; then
+        log_info "سیستم‌عامل openSUSE شناسایی شد (zypper)..."
+        if [ "$(id -u)" -eq 0 ]; then
+            zypper --non-interactive install ffmpeg && installed=true || true
+        elif command -v sudo &>/dev/null; then
+            sudo zypper --non-interactive install ffmpeg && installed=true || true
+        fi
+    fi
+
+    if [ "$installed" = true ] && command -v ffmpeg &>/dev/null; then
+        log_ok "ابزار FFmpeg با موفقیت روی سرور نصب و فعال شد."
+    else
+        log_warn "نصب خودکار FFmpeg به دلیل عدم دسترسی روت یا تفاوت مخازن انجام نشد."
+        log_info "در صورت تمایل، می‌توانید آن را به صورت دستی نصب کرده یا باینری مستقل را از سایت رسمی دانلود نمایید:"
+        log_info "🔗 صفحه رسمی دانلود FFmpeg: https://ffmpeg.org/download.html"
+    fi
+}
+
 download_file() {
     local url="$1"
     local dest="$2"
@@ -265,6 +333,9 @@ HOST=0.0.0.0
 EOF
     chmod 600 "$env_file"
     log_ok "فایل تنظیمات امنیتی (.env) ایجاد شد."
+
+    # پیشنهاد نصب اختیاری FFmpeg برای لایو استریم
+    suggest_install_ffmpeg
 
     echo ""
     echo -e "${CLR_BOLD}مرحله ۴: سرویس‌دهی پس‌زمینه (Systemd)${CLR_RESET}"
